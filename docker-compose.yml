@@ -6,16 +6,16 @@ services:
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:8880"
+      - "--entrypoints.web.address=:${HTTP_PORT:-8880}"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      - "--entrypoints.websecure.address=:8443"
+      - "--entrypoints.websecure.address=:${HTTPS_PORT:-8443}"
       - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
     ports:
-      - "8880:8880"
-      - "8443:8443"
-      - "8889:8080"
+      - "${HTTP_PORT:-8880}:${HTTP_PORT:-8880}"
+      - "${HTTPS_PORT:-8443}:${HTTPS_PORT:-8443}"
+      - "${DASHBOARD_PORT:-8889}:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - letsencrypt:/letsencrypt

@@ -23,7 +23,13 @@ POSTGRES_PASSWORD=postgres
 POSTGRES_DB=userdb
 
 ACME_EMAIL=admin@example.com
+
+HTTP_PORT=8880
+HTTPS_PORT=8443
+DASHBOARD_PORT=8889
 ```
+
+All ports have defaults (`8880`, `8443`, `8889`) and can be omitted from `.env` if the defaults are fine. For deployment, change them to e.g. `80`, `443`, `8080`.
 
 ## Build & Start
 
@@ -49,6 +55,8 @@ docker compose down -v
 ```
 
 ## Accessing the Application
+
+The URLs below use the default ports. Replace with your `.env` values if changed.
 
 ### Traefik Dashboard
 
