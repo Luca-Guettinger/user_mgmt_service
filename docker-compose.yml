@@ -2,6 +2,8 @@ services:
   traefik:
     image: traefik:v3.4
     env_file: .env
+    environment:
+      - DOCKER_API_VERSION=1.40
     command:
       - "--api.dashboard=true"
       - "--api.insecure=true"
