@@ -1,6 +1,7 @@
 services:
   traefik:
     image: traefik:v3.4
+    env_file: .env
     command:
       - "--api.dashboard=true"
       - "--api.insecure=true"
