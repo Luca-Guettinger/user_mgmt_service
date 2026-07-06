@@ -46,11 +46,11 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN}`) && PathPrefix(`/backend`)"
+      - "traefik.http.routers.backend.middlewares=strip-backend"
+      - "traefik.http.middlewares.strip-backend.stripprefix.prefixes=/backend"
       - "traefik.http.routers.backend.entrypoints=websecure"
       - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.backend.middlewares=strip-api"
-      - "traefik.http.middlewares.strip-api.stripprefix.prefixes=/api"
       - "traefik.http.services.backend.loadbalancer.server.port=8080"
 
   portal:
