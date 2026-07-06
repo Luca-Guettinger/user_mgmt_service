@@ -41,7 +41,7 @@ public class WebSecurityConfig {
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     RequestMatcher loginPostMatcher = request ->
-        "/users/login".equals(request.getServletPath()) && HttpMethod.POST.matches(request.getMethod());
+        "/users/login".equals(request.getRequestURI()) && HttpMethod.POST.matches(request.getMethod());
     return http
         .authorizeHttpRequests(requests -> requests
             .requestMatchers("/actuator/health").permitAll()
