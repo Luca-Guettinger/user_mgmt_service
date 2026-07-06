@@ -54,7 +54,10 @@ services:
       - "traefik.http.services.backend.loadbalancer.server.port=8080"
 
   portal:
-      build: ./auth_portal-main
+      build: 
+        context: ./auth_portal-main
+        args:
+          NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       env_file: .env
       networks:
         - backend
