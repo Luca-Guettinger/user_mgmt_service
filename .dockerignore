@@ -1,6 +1,11 @@
 .git
 .idea
+.vscode
 .gradle
 .env
 build
 *.md
+auth_portal-main
+.github
+traefik
+docker-compose*.yml

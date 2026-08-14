@@ -1,0 +1,34 @@
+http:
+  routers:
+    backend:
+      rule: "PathPrefix(`/backend`)"
+      entryPoints:
+        - websecure
+      middlewares:
+        - strip-backend
+      service: backend
+      priority: 100
+
+    portal:
+      rule: "PathPrefix(`/`)"
+      entryPoints:
+        - websecure
+      service: portal
+      priority: 1
+
+  middlewares:
+    strip-backend:
+      stripPrefix:
+        prefixes:
+          - "/backend"
+
+  services:
+    backend:
+      loadBalancer:
+        servers:
+          - url: "http://backend:8080"
+
+    portal:
+      loadBalancer:
+        servers:
+          - url: "http://portal:3000"

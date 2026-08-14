@@ -1,109 +1,112 @@
-# Build & Run Guide
+# Build & Deploy
 
-## Prerequisites
+Four containers: `traefik` (proxy and HTTPS), `postgres`, `backend` (Spring Boot), `portal` (Next.js).
 
-- Docker & Docker Compose
-- A `.env` file in the project root (see below)
+Traefik is configured by the files in `traefik/`, not by labels on the containers:
 
-## Environment Variables
+* `traefik/traefik.yml` has the ports, TLS and Let's Encrypt settings
+* `traefik/dynamic.yml` has the routes
 
-Create a `.env` file:
+Routing is simple:
+
+| Path | Goes to |
+|---|---|
+| `/backend/*` | `backend:8080`, with `/backend` stripped off |
+| anything else | `portal:3000` |
+
+## Running it locally
+
+You need a `.env` file. Copy `.env.example` and fill in the passwords.
+
+Ports 80 and 443 are usually not available on a dev machine, so override them in `.env`:
 
 ```env
-SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/userdb
-SPRING_DATASOURCE_USERNAME=postgres
-SPRING_DATASOURCE_PASSWORD=postgres
-SPRING_JPA_HIBERNATE_DDL_AUTO=update
-JWT_ISSUER=user-mgmt-service
-JWT_SECRET=change-me-to-a-secure-secret
-JWT_EXPIRATION_MILLIS=3600000
-
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DB=userdb
-
-ACME_EMAIL=admin@example.com
-
 HTTP_PORT=8880
 HTTPS_PORT=8443
-DASHBOARD_PORT=8889
+NEXT_PUBLIC_API_URL=https://localhost:8443/backend
 ```
 
-All ports have defaults (`8880`, `8443`, `8889`) and can be omitted from `.env` if the defaults are fine. For deployment, change them to e.g. `80`, `443`, `8080`.
-
-## Build & Start
+The base compose file pulls prebuilt images, so add the dev override to build from source instead:
 
 ```bash
-docker compose up --build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-This starts 3 services:
-- **traefik** — Reverse proxy with TLS termination
-- **postgres** — PostgreSQL 16 database
-- **backend** — Spring Boot app (only reachable via Traefik)
-
-To stop:
+Check that it works. The `-k` is needed because there is no real certificate for localhost:
 
 ```bash
-docker compose down
+curl -k https://localhost:8443/backend/actuator/health
+curl -k -L https://localhost:8443/
 ```
 
-To stop and delete the database volume:
+Stop it with `docker compose down`, or `docker compose down -v` to also wipe the database.
+
+The Traefik dashboard is on <http://localhost:8889/dashboard/>. Both routes should show up there under
+the File provider.
+
+## Deploying
+
+Push to `main`. The workflow runs the tests, builds both images, pushes them to GHCR, then connects to
+the server over SSH and restarts it. The server never builds anything, it only pulls the images. The
+commands it runs are in the `Pull and restart` step of the workflow.
+
+If the app does not come up afterwards, the workflow fails.
+
+### Setting it up
+
+On the server, so the deploy does not need a password for Docker:
 
 ```bash
-docker compose down -v
+sudo usermod -aG docker ubuntu
 ```
 
-## Accessing the Application
-
-The URLs below use the default ports. Replace with your `.env` values if changed.
-
-### Traefik Dashboard
-
-```
-http://localhost:8889/dashboard/
-```
-
-Shows all registered routes, services, and middlewares.
-
-### Health Endpoint (HTTPS)
+Then create a key for the deploy and put it on the server. The second command asks for your server
+password, and it is the only time you need it:
 
 ```bash
-curl -k https://localhost:8443/api/actuator/health
+ssh-keygen -t ed25519 -C gha-deploy -f ~/.ssh/nightnode-deploy -N ""
+
+cat ~/.ssh/nightnode-deploy.pub | ssh ubuntu@compose.nightnode.io \
+  "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
 ```
 
-The `-k` flag is required because Let's Encrypt cannot issue certificates for localhost, so Traefik uses a self-signed certificate. In Postman, disable SSL verification under Settings.
-
-### HTTP to HTTPS Redirect
+Check it worked. This should not ask for a password:
 
 ```bash
-curl -v http://localhost:8880/api/actuator/health
+ssh -i ~/.ssh/nightnode-deploy ubuntu@compose.nightnode.io "docker compose version"
 ```
 
-Returns a `301 Moved Permanently` redirect to `https://localhost:8443/api/actuator/health`.
+Now add these under Settings, Secrets and variables, Actions.
 
-### Backend is NOT Directly Accessible
+Secrets:
 
-The backend has no exposed ports. Direct access does not work:
+| Name | Value |
+|---|---|
+| `SSH_PRIVATE_KEY` | the contents of `~/.ssh/nightnode-deploy`, the file without `.pub` |
+| `SSH_FINGERPRINT` | `ssh-keyscan -t ed25519 compose.nightnode.io \| ssh-keygen -lf -` and take the `SHA256:...` part |
+
+Variables:
+
+| Name | Value |
+|---|---|
+| `DEPLOY_HOST` | `compose.nightnode.io` |
+| `DEPLOY_USER` | `ubuntu` |
+| `DEPLOY_PATH` | `/home/ubuntu/git/user_mgmt_service` |
+| `NEXT_PUBLIC_API_URL` | `https://compose.nightnode.io/backend` |
+
+### Going back to an older version
+
+Every commit on `main` has an image tagged with its SHA:
 
 ```bash
-# These will NOT work - backend is only reachable through Traefik
-curl http://localhost:8080/actuator/health    # Connection refused
-curl http://localhost:8080/users/register     # Connection refused
+cd /home/ubuntu/git/user_mgmt_service
+IMAGE_TAG=sha-<commit> docker compose up -d
 ```
 
-The only way to reach the backend is through Traefik via `/api`:
+## Two things that are easy to get wrong
 
-```bash
-# This works
-curl -k https://localhost:8443/api/actuator/health
+The domain and the Let's Encrypt email are in `traefik/traefik.yml` and not in `.env`. Traefik ignores
+environment variables when it has a config file, so putting them in `.env` does nothing.
 
-# This also works (register endpoint)
-curl -k -X POST https://localhost:8443/api/users/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"secret"}'
-```
-
-### Database is NOT Exposed
-
-PostgreSQL is only reachable by the backend via the internal Docker network. There is no port mapping — you cannot connect to it from your host machine.
+`NEXT_PUBLIC_API_URL` is compiled into the portal when the image is built, so it has to be the public
+URL. It cannot be `http://backend:8080`, because the browser has to be able to reach it too.

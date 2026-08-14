@@ -1,0 +1,9 @@
+services:
+  backend:
+    build: .
+
+  portal:
+    build:
+      context: ./auth_portal-main
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
