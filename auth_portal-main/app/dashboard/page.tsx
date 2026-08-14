@@ -2,6 +2,7 @@
 
 import {AppSidebar} from "@/components/dashboard/app-sidebar"
 import {Button} from "@/components/ui/button"
+import Link from "next/link"
 import {useTheme} from "next-themes"
 import {Moon, Sun} from "lucide-react"
 import {
@@ -43,7 +44,10 @@ export default function Page() {
               </BreadcrumbList>
             </Breadcrumb>
           </div>
-          <div className="px-4">
+          <div className="flex items-center gap-2 px-4">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/impressum">Impressum</Link>
+            </Button>
             <Button
               variant="ghost"
               size="icon"
