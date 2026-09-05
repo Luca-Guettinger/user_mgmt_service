@@ -85,55 +85,78 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
-  deploy:
-    name: Deploy
+  # The cluster is not deployed to from here. ArgoCD in the DigitalOcean cluster
+  # watches user_mgmt_gitops and applies whatever that repo says. So "deploying"
+  # from this repo means one thing: committing the tag of the images we just
+  # built into that repo, and letting ArgoCD do the rest.
+  bump:
+    name: Point GitOps at this commit
     needs: build
     runs-on: ubuntu-latest
     environment: production
-    permissions:
-      contents: read
-      packages: read
+    # Nothing here uses the automatic token; the push below uses GITOPS_PAT.
+    permissions: {}
     steps:
-      - name: Pull and restart
-        uses: appleboy/ssh-action@v1
-        env:
-          GHCR_USER: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          IMAGE_TAG: sha-${{ github.sha }}
-          GIT_SHA: ${{ github.sha }}
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      - name: Check out the ops repo
+        uses: actions/checkout@v4
         with:
-          host: ${{ vars.DEPLOY_HOST }}
-          username: ${{ vars.DEPLOY_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
-          envs: GHCR_USER,GHCR_TOKEN,IMAGE_TAG,GIT_SHA,DEPLOY_PATH
-          script: |
-            set -euo pipefail
+          repository: Luca-Guettinger/user_mgmt_gitops
+          ref: main
+          # Fine-grained PAT, Contents: Read and write, scoped to that repo only.
+          token: ${{ secrets.GITOPS_PAT }}
 
-            cd "$DEPLOY_PATH"
-            git fetch --prune origin
-            git reset --hard "$GIT_SHA"
-
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            docker compose pull
-            docker compose up -d --remove-orphans
-            docker logout ghcr.io
-
-            docker image prune -f
-            docker compose ps
-
-      - name: Health gate
+      - name: Set the production image tag
+        env:
+          NEW_TAG: sha-${{ github.sha }}
         run: |
-          base="https://${{ vars.DEPLOY_HOST }}"
-          for i in $(seq 1 20); do
-            if curl -fsS --max-time 10 "$base/backend/actuator/health" \
-               && curl -fsS --max-time 10 -o /dev/null "$base/"; then
-              echo "healthy after ${i} attempt(s)"
+          set -euo pipefail
+          f=charts/user-mgmt/values-prod.yaml
+
+          # global.imageTag is the only key at this indentation in that file.
+          sed -i -E "s|^([[:space:]]{2}imageTag:).*|\1 ${NEW_TAG}|" "$f"
+
+          # If the key is ever renamed or re-indented the sed above silently does
+          # nothing, which would give a green deploy that shipped no code. Fail here
+          # instead.
+          grep -qx "  imageTag: ${NEW_TAG}" "$f"
+
+      - name: Commit and push
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "Already pointing at ${GITHUB_SHA}, nothing to commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "deploy user_mgmt_service@${GITHUB_SHA}"
+          git push
+
+  verify:
+    name: Verify rollout
+    needs: bump
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Wait for ArgoCD to sync and the app to answer
+        env:
+          # https://vsc.notenverwaltung.ch/backend
+          API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+        run: |
+          set -uo pipefail
+          site="${API_URL%/backend}"
+
+          # ArgoCD polls Git roughly every 3 minutes, so the new revision is not
+          # live the moment the commit above lands. Allow 10 minutes.
+          for i in $(seq 1 40); do
+            if curl -fsS --max-time 10 -o /dev/null "${API_URL}/actuator/health" \
+               && curl -fsS --max-time 10 -o /dev/null "${site}/"; then
+              echo "Healthy after ${i} attempt(s)."
               exit 0
             fi
-            echo "not ready yet (attempt ${i}/20), retrying in 5s"
-            sleep 5
+            echo "Not ready yet (${i}/40), retrying in 15s."
+            sleep 15
           done
-          echo "::error::service did not become healthy"
+
+          echo "::error::Site did not become healthy within 10 minutes."
           exit 1
