@@ -47,6 +47,8 @@ public class WebSecurityConfig {
             .requestMatchers("/actuator/health").permitAll()
             // Scraped by Prometheus, which carries no JWT.
             .requestMatchers("/actuator/prometheus").permitAll()
+            // Spring forwards failed requests here; without this a 500 reaches the client as 403.
+            .requestMatchers("/error").permitAll()
             .requestMatchers(HttpMethod.POST, "/users/login").permitAll()
             .requestMatchers(HttpMethod.POST, "/users/register").permitAll()
             .anyRequest().authenticated())
