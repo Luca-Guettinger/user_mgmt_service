@@ -45,6 +45,8 @@ public class WebSecurityConfig {
     return http
         .authorizeHttpRequests(requests -> requests
             .requestMatchers("/actuator/health").permitAll()
+            // Scraped by Prometheus, which carries no JWT.
+            .requestMatchers("/actuator/prometheus").permitAll()
             .requestMatchers(HttpMethod.POST, "/users/login").permitAll()
             .requestMatchers(HttpMethod.POST, "/users/register").permitAll()
             .anyRequest().authenticated())
