@@ -2,17 +2,24 @@ package com.example.jwt.domain.user.dto;
 
 import com.example.jwt.core.generic.ExtendedDTO;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import java.util.UUID;
 
 public class UserRegisterDTO extends ExtendedDTO {
 
+  // Without these the request reaches the database and a missing value comes
+  // back as a 500 from a not-null constraint instead of a 400.
+  @NotBlank
   private String firstName;
 
+  @NotBlank
   private String lastName;
 
+  @NotBlank
   @Email
   private String email;
 
+  @NotBlank
   private String password;
 
 
