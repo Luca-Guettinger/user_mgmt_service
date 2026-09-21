@@ -9,3 +9,4 @@ auth_portal-main
 .github
 traefik
 docker-compose*.yml
+module_service

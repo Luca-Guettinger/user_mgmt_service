@@ -56,6 +56,10 @@ jobs:
             image: auth-portal
             build-args: |
               NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+          - name: modules
+            context: ./module_service
+            image: module-service
+            build-args: ""
     steps:
       - uses: actions/checkout@v4
 
