@@ -44,7 +44,12 @@ public class WebSecurityConfig {
         "/users/login".equals(request.getRequestURI()) && HttpMethod.POST.matches(request.getMethod());
     return http
         .authorizeHttpRequests(requests -> requests
-            .requestMatchers("/actuator/health").permitAll()
+            // The kubelet probes these; /** covers the liveness and readiness groups.
+            .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+            // Scraped by Prometheus, which carries no JWT.
+            .requestMatchers("/actuator/prometheus").permitAll()
+            // Spring forwards failed requests here; without this a 500 reaches the client as 403.
+            .requestMatchers("/error").permitAll()
             .requestMatchers(HttpMethod.POST, "/users/login").permitAll()
             .requestMatchers(HttpMethod.POST, "/users/register").permitAll()
             .anyRequest().authenticated())
