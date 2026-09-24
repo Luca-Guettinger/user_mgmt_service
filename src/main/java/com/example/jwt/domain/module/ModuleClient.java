@@ -4,9 +4,11 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -66,6 +68,24 @@ public class ModuleClient {
         .uri("/api/v1/users/{userId}/modules/{moduleId}", userId, moduleId)
         .retrieve()
         .toBodilessEntity();
+  }
+
+  /** Every module the module service knows, for the catalogue in the portal. */
+  @Retry(name = "moduleService", fallbackMethod = "listUnavailable")
+  @CircuitBreaker(name = "moduleService")
+  public List<ModuleDto> list() {
+    return http.get()
+        .uri("/api/v1/modules")
+        .retrieve()
+        .body(new ParameterizedTypeReference<List<ModuleDto>>() {
+        });
+  }
+
+  @SuppressWarnings("unused")
+  private List<ModuleDto> listUnavailable(Throwable cause) {
+    logger.warn("Module service unreachable while listing modules: {}", cause.toString());
+    throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+        "Module service is currently unavailable");
   }
 
   private boolean isAvailable(UUID moduleId) {

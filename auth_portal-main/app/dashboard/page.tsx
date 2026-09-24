@@ -1,6 +1,7 @@
 "use client"
 
 import {AppSidebar} from "@/components/dashboard/app-sidebar"
+import {Modules} from "@/components/dashboard/modules"
 import {Button} from "@/components/ui/button"
 import Link from "next/link"
 import {useTheme} from "next-themes"
@@ -66,7 +67,7 @@ export default function Page() {
             <div className="aspect-video rounded-xl bg-muted/50" />
             <div className="aspect-video rounded-xl bg-muted/50" />
           </div>
-          <div className="min-h-screen flex-1 rounded-xl bg-muted/50 md:min-h-min" />
+          <Modules />
         </div>
       </SidebarInset>
     </SidebarProvider>
