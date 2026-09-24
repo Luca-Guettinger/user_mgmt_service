@@ -17,6 +17,21 @@ def list_modules(db: Session) -> list[Module]:
     return list(db.scalars(statement))
 
 
+def list_user_modules(db: Session, user_id: UUID) -> list[Module]:
+    """Every module assigned to one user.
+
+    The join is the reason this service exists: users_modules and modules live in
+    MySQL, which only this service may read.
+    """
+    statement = (
+        select(Module)
+        .join(UserModule, UserModule.module_id == Module.id)
+        .where(UserModule.user_id == str(user_id))
+        .order_by(Module.code)
+    )
+    return list(db.scalars(statement))
+
+
 def get_module(db: Session, module_id: UUID) -> Module | None:
     return db.get(Module, str(module_id))
 

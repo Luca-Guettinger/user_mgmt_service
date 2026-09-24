@@ -27,13 +27,21 @@ export function Modules() {
   const [busy, setBusy] = useState<string | null>(null)
   const [assigned, setAssigned] = useState<string[]>([])
 
-  useEffect(() => {
+  // The route returns the catalogue and the ids this user already has, so a
+  // reload or a fresh login shows the true state rather than a blank slate.
+  const load = () =>
     fetch("/api/modules")
       .then((res) => {
         if (!res.ok) throw new Error(`Modules unavailable (${res.status})`)
         return res.json()
       })
-      .then(setModules)
+      .then((data: { modules: Module[]; assigned: string[] }) => {
+        setModules(data.modules)
+        setAssigned(data.assigned)
+      })
+
+  useEffect(() => {
+    load()
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
@@ -48,8 +56,9 @@ export function Modules() {
         body: JSON.stringify({ moduleId }),
       })
       if (!res.ok) throw new Error(`Could not assign (${res.status})`)
-      // Assigning is idempotent, so pressing it twice is harmless.
-      setAssigned((current) => [...new Set([...current, moduleId])])
+      // Re-read instead of guessing: what the database says is the truth, and
+      // assigning is idempotent so pressing it twice is harmless.
+      await load()
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -91,7 +100,7 @@ export function Modules() {
             <Button
               size="sm"
               variant={assigned.includes(module.id) ? "outline" : "default"}
-              disabled={busy === module.id}
+              disabled={busy === module.id || assigned.includes(module.id)}
               onClick={() => assign(module.id)}
             >
               {busy === module.id

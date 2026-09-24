@@ -81,9 +81,30 @@ public class ModuleClient {
         });
   }
 
+  /** The modules already assigned to one user. An unknown user gives an empty list. */
+  @Retry(name = "moduleService", fallbackMethod = "listForUserUnavailable")
+  @CircuitBreaker(name = "moduleService")
+  public List<ModuleDto> listForUser(UUID userId) {
+    return http.get()
+        .uri("/api/v1/users/{userId}/modules", userId)
+        .retrieve()
+        .body(new ParameterizedTypeReference<List<ModuleDto>>() {
+        });
+  }
+
   @SuppressWarnings("unused")
   private List<ModuleDto> listUnavailable(Throwable cause) {
-    logger.warn("Module service unreachable while listing modules: {}", cause.toString());
+    return unreachable("listing modules", cause);
+  }
+
+  // A fallback has to mirror its method's parameters, so this one takes the user id.
+  @SuppressWarnings("unused")
+  private List<ModuleDto> listForUserUnavailable(UUID userId, Throwable cause) {
+    return unreachable("listing the modules of " + userId, cause);
+  }
+
+  private List<ModuleDto> unreachable(String what, Throwable cause) {
+    logger.warn("Module service unreachable while {}: {}", what, cause.toString());
     throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
         "Module service is currently unavailable");
   }

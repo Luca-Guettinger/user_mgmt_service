@@ -1,10 +1,12 @@
 package com.example.jwt.domain.module;
 
 import com.example.jwt.domain.user.UserService;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -45,5 +47,16 @@ public class ModuleAssignmentController {
 
     moduleClient.assign(userId, moduleId);
     return ResponseEntity.noContent().build();
+  }
+
+  /** What this user already has, so the portal can show it instead of guessing. */
+  @GetMapping("/{userId}/modules")
+  public ResponseEntity<List<ModuleDto>> retrieveAssigned(@PathVariable UUID userId) {
+    if (!userService.existsById(userId)) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+          String.format("User '%s' could not be found", userId));
+    }
+
+    return ResponseEntity.ok(moduleClient.listForUser(userId));
   }
 }
