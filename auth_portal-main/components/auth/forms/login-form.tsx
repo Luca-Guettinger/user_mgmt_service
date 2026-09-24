@@ -29,7 +29,11 @@ export function LoginForm({
     reset,
     formState: { errors, isValid, isSubmitting }
   } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema)
+    resolver: zodResolver(loginSchema),
+    // isValid is only maintained in onChange/onTouched/onBlur mode. With the
+    // default onSubmit mode it stays false, so the disabled submit button below
+    // never enables and the form can never be sent. Signup already sets this.
+    mode: "onChange"
   })
 
   return (
